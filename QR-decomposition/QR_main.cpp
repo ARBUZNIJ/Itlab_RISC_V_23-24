@@ -6,23 +6,25 @@
 
 int main()
 {
-	omp_set_num_threads(24);
+	//omp_set_num_threads(24);
 	int count = 0;
-	size_t n;
+	size_t n, block_size;
 	cout << "Enter matrix dimentions: " << endl;
 	cin >> n;
-	while (count < 5)
-	{
-		QR <double> t(0, n);
+	cout << "Enter block size: ";
+	cin >> block_size;
+	//while (count < 5)
+	//{
+		QR <double> t(0, n, block_size);
 		auto start{ chrono::steady_clock::now() };
 		t.HHolder_A();
 		t.HHolder_R();
 		auto end{ chrono::steady_clock::now() };
 		chrono::duration<double> elapsed_seconds = end - start;
 		cout << "Time spent: " << elapsed_seconds.count() << " sec" << endl;
-		count++;
-	}
-	/*start = chrono::steady_clock::now();
+	/*	count++;
+	}*/
+	start = chrono::steady_clock::now();
 	t.HHolder_Q();
 	t.transpQ();
 	end = chrono::steady_clock::now();
@@ -31,6 +33,6 @@ int main()
 	if (t.check())
 		cout << "QR-decomposition is correct";
 	else cout << "QR-decomposition is incorrect";
-	*/
+	
 	return 0;
 }
