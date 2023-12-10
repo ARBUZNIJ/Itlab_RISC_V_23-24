@@ -419,3 +419,54 @@
 //{
 //	return scl_n(data, ind, data, ind);
 //}
+//
+//void HHolder_Q()
+//{
+//	//#pragma omp parallel for private(i)
+//	for (i = 0; i < n; i++)
+//		Q[i * n + i] = TMP[i * n + i] = 1.0;
+//
+//	k = n - 1;
+//	form_v(k);
+//
+//	gamma = -1 / gamma;
+//	Q[k * n + k] = v[k] * v[k] * gamma + 1.0;
+//
+//	for (k = n - 2; k >= 0; k--)
+//	{
+//		form_v(k);
+//		gamma = -1 / gamma;
+//
+//		for (i = k; i < n; i++)
+//			//#pragma omp parallel for private(j)
+//			for (j = k; j < n; j++)
+//			{
+//				TMP[i * n + j] = v[i] * v[j] * gamma;
+//				if (i == j) TMP[i * n + j]++;
+//			}
+//
+//		Q_mult_TMP_put_Q(k);
+//
+//		if (k == 0) break;
+//	}
+//
+//}
+//
+//
+//void Q_mult_TMP_put_Q(size_t ind)
+//{
+//	T* RES = new T[n * n]();
+//
+//#pragma omp parallel for private(i)
+//	for (size_t i = 0; i < ind; i++)
+//		RES[i * n + i] = 1.0;
+//
+//	for (size_t i = ind; i < n; i++)
+//		for (size_t k = ind; k < n; k++)
+//			//#pragma omp parallel for simd
+//			for (size_t j = ind; j < n; j++)
+//				RES[i * n + j] += Q[i * n + k] * TMP[k * n + j];
+//
+//	swap(RES, Q);
+//
+//}
