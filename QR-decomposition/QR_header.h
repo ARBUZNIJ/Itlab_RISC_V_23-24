@@ -3,6 +3,8 @@
 #include <cstdlib>
 #include <cmath>
 #include <omp.h>
+#include <chrono>
+#include <C:\Program Files (x86)\Intel\oneAPI\mkl\2023.2.0\include\mkl.h>
 
 //const size_t bs = 32;
 using namespace std;
@@ -12,19 +14,19 @@ class QR
 private:
 
 	size_t i, j, k, n, block_size;
-	T* Q, * R, * REF_A, * v;
+	T* Q, * R, * REF_A, * v, * u, * factor;
 	T eps = 1e-10, gamma;
 
 public:
 
-	QR(bool flag, size_t size, size_t block_size) //flag = 0 - ввод рандомных чисел, иначе ввод с клавиатуры
+	QR(bool flag, size_t size, size_t b_s) : n(size), block_size(b_s)//flag = 0 - ввод рандомных чисел, иначе ввод с клавиатуры
 	{
-		n = size;
-		Q = new T[n * n]();
-		R = new T[n * n]();
-		REF_A = new T[n * n]();
-		
-		this->block_size = block_size;
+		Q = new T[n * n];
+		R = new T[n * n];
+		REF_A = new T[n * n];
+		factor = new T[n];
+		u = new T[n];
+		v = new T[n];
 
 		if (flag)
 		{
@@ -53,12 +55,34 @@ public:
 			//#pragma omp parallel for schedule(static) private(i)
 			for (i = 0; i < n; i++)
 				copy(R + i * n, R + (i + 1) * n, REF_A + i * n);
+
+			auto start{ chrono::steady_clock::now() };
+			LAPACKE_dgeqrf(LAPACK_ROW_MAJOR, n, n, REF_A, n, v);
+			LAPACKE_dorgqr(LAPACK_ROW_MAJOR, n, n, n, REF_A, n, v);
+			auto end{ chrono::steady_clock::now() };
+			chrono::duration<double> elapsed_seconds = end - start;
+			cout << "Time spent (MKL): " << elapsed_seconds.count() << endl;
+
+			for (i = 0; i < n; i++)
+				copy(R + i * n, R + (i + 1) * n, REF_A + i * n);
+
 		}
+
 	}
+
+	double* returnR()
+	{
+		return R;
+	}
+
+	double* returnV()
+	{
+		return v;
+	}
+
 	void form_v_gamma(size_t ind)
 	{
-		v = new T[n](); //дл€ типа T должен существовать конструктор по умолчанию;
-		T* u = new T[n - ind];
+		 //дл€ типа T должен существовать конструктор по умолчанию;
 		T scl = 0;
 		//#pragma omp parallel for simd reduction(+: scl) 
 		 
@@ -89,18 +113,6 @@ public:
 			return;
 		}
 	}
-	void form_v(size_t k)
-	{
-		v = new T[n]();
-
-		//#pragma omp parallel for simd
-		for (size_t m = k; m < n; m++)
-			v[m] = R[(m + 1) * n + k];
-
-		gamma = abs(v[k]);
-
-		return;
-	}
 	T sgn(T val)                //неканоничный sign(x), который возвращает 1 дл€ неотрицательных, иначе -1 68719476736
 	{
 		if (val >= 0)
@@ -108,11 +120,12 @@ public:
 		else return -1;
 	}
 
-	T scal(size_t ind)  //функци€ скал€рного произведени€ дл€ ind столбцa матрицы A и вектора v
+	T scal(size_t k, size_t ind)  //функци€ скал€рного произведени€ дл€ ind столбцa матрицы A и вектора v, первый ненулевой элемент в котором располагаетс€ в позиции ind
 	{
 		T res = 0;
-		for (size_t i = 0; i < n; i++)
-			res += R[i * n + ind] * v[i];
+//#pragma omp simd
+		for (size_t i = ind; i < n; i++)
+			res += R[i * n + k] * v[i];
 		return res;
 	}
 	void HHolder_A()
@@ -128,44 +141,40 @@ public:
 	}
 	void HHolder_Block(size_t i_start, size_t b_size)
 	{
-
-		T* factor;
 		for (j = i_start; j < i_start + b_size; j++)
 		{
 			form_v_gamma(j);
 
-			factor = new T[n - j]();
-
-//#pragma omp parallel for private(k)
+#pragma omp parallel for simd private(k)       //??
 			for (k = j; k < n; k++)
-				factor[k - j] = scal(k) / gamma;
+				factor[k - j] = scal(k, j) / gamma;
 
+#pragma omp parallel for simd private(i)       //??
 			for (i = j; i < n; i++)
 			{
 
-//#pragma omp parallel for simd private(k) 
+//#pragma omp simd
 				for (k = j; k < n; k++)
 					R[i * n + k] -= v[i] * factor[k - j];
 			}
 		}
 	}
+
 	void HHolder_Q()
 	{
-		T* factor;
-
+#pragma omp parallel for private(i)
 		for (i = 0; i < n; i++)
 			copy(REF_A + i * n, REF_A + (i + 1) * n, Q + i * n);
 
 		for (i = 0; i < n; i++)
 		{
-
+#pragma omp parallel for private(j)
 			for (j = 0; j < n; j++)
 				Q[j * n + i] /= R[i * n + i];
 
-			factor = new T[n - i - 1];
-
 			copy(R + i * (n + 1) + 1, R + (i + 1) * n, factor);
 
+#pragma omp parallel for private(k)
 			for (k = 0; k < n; k++)
 				for (j = i + 1; j < n; j++)
 
@@ -202,6 +211,7 @@ public:
 				for (j = 0; j < n; j++)
 					cout << R[i * n + j] << ' ';
 				cout << endl;
+
 			}
 
 		else if (s == 'Q')
@@ -210,15 +220,6 @@ public:
 			{
 				for (j = 0; j < n; j++)
 					cout << Q[i * n + j] << ' ';
-				cout << endl;
-			}
-
-		else if (s == 'A')
-
-			for (i = 0; i < n + 1; i++)
-			{
-				for (j = 0; j < n; j++)
-					cout << A[i * n + j] << ' ';
 				cout << endl;
 			}
 		cout << endl;
@@ -240,9 +241,11 @@ public:
 		delete[]Q;
 		delete[]R;
 		delete[]v;
+		delete[]u;
 		delete[]REF_A;
+		delete[]factor;
 
-		Q = R = REF_A = v = nullptr;
+		Q = R = u = REF_A = v = factor = nullptr;
 		i = j = k = 0;
 	}
 };
