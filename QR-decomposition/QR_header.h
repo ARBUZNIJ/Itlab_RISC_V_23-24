@@ -4,7 +4,7 @@
 #include <cmath>
 #include <omp.h>
 #include <chrono>
-#include <C:\Program Files (x86)\Intel\oneAPI\mkl\2023.2.0\include\mkl.h>
+//#include <C:\Program Files (x86)\Intel\oneAPI\mkl\2023.2.0\include\mkl.h>
 
 //const size_t bs = 32;
 using namespace std;
@@ -14,8 +14,8 @@ class QR
 private:
 
 	size_t i, j, k, n, block_size;
-	T* Q, * R, * REF_A, * v, * u, * factor;
-	T eps = 1e-10, gamma;
+	T* Q, * R, * REF_A, * v, * u, * factor, * factor_block;
+	T eps = 1e-10 /*, gamma*/;
 
 public:
 
@@ -24,9 +24,10 @@ public:
 		Q = new T[n * n];
 		R = new T[n * n];
 		REF_A = new T[n * n];
-		factor = new T[n];
+		factor = new T[block_size * n];
+		factor_block = new T[block_size];
 		u = new T[n];
-		v = new T[n];
+		v = new T[block_size * n];
 
 		if (flag)
 		{
@@ -56,12 +57,12 @@ public:
 			for (i = 0; i < n; i++)
 				copy(R + i * n, R + (i + 1) * n, REF_A + i * n);
 
-			auto start{ chrono::steady_clock::now() };
+			/*auto start{ chrono::steady_clock::now() };
 			LAPACKE_dgeqrf(LAPACK_ROW_MAJOR, n, n, REF_A, n, v);
 			LAPACKE_dorgqr(LAPACK_ROW_MAJOR, n, n, n, REF_A, n, v);
 			auto end{ chrono::steady_clock::now() };
 			chrono::duration<double> elapsed_seconds = end - start;
-			cout << "Time spent (MKL): " << elapsed_seconds.count() << endl;
+			cout << "Time spent (MKL): " << elapsed_seconds.count() << endl;*/
 
 			for (i = 0; i < n; i++)
 				copy(R + i * n, R + (i + 1) * n, REF_A + i * n);
@@ -80,21 +81,21 @@ public:
 		return v;
 	}
 
-	void form_v_gamma(size_t ind)
+	void count_v_gamma(size_t column, size_t num_in_block)
 	{
-		 //для типа T должен существовать конструктор по умолчанию;
-		T scl = 0;
+		T scl, gamma;
 		//#pragma omp parallel for simd reduction(+: scl) 
-		 
-		for (size_t i = 0; i < n - ind; i++)
+		scl = 0;
+
+		for (size_t i = 0; i < n - column; i++)
 		{
-			u[i] = R[(i + ind) * n + ind];
+			u[i] = R[(i + column) * n + column];
 			scl += u[i] * u[i];
 		}
 
 		if (scl < eps)
 		{
-			v[ind] = 1;
+			v[num_in_block * n + column] = 1;
 			gamma = 0.5;
 			return;
 		}
@@ -104,31 +105,39 @@ public:
 			scl = 1 / sqrt(scl);
 			u[0] *= scl;
 			gamma = (1 + abs(u[0]));
-			v[ind] = sgn(u[0]) * gamma;
+			v[num_in_block * n + column] = sgn(u[0]) * gamma;
 
 			//#pragma omp parallel for simd
-			for (size_t i = ind + 1; i < n; i++)
-				v[i] = u[i - ind] * scl;
-
-			return;
+			for (size_t i = column + 1; i < n; i++)
+				v[num_in_block * n + i] = u[i - column] * scl;
 		}
 	}
-	T sgn(T val)                //неканоничный sign(x), который возвращает 1 для неотрицательных, иначе -1 68719476736
+
+	void count_factor(size_t start, size_t b_size, size_t v_ind) //порядок циклов!!!
+	{		
+			for (size_t j = start; j < n; j++) // по столбцам А
+
+				for (size_t i = 0; i < b_size; i++) // по векторам v
+			
+					factor[i * n + (j - start)] = scal(i, start-b_size+i, j) / abs(v[i * n + (v_ind+i)]);
+			
+	}
+	T sgn(T val)                //неканоничный sign(x), который возвращает 1 для неотрицательных x, иначе -1
 	{
 		if (val >= 0)
 			return 1;
 		else return -1;
 	}
 
-	T scal(size_t k, size_t ind)  //функция скалярного произведения для ind столбцa матрицы A и вектора v, первый ненулевой элемент в котором располагается в позиции ind
+	T scal(size_t v_num_in_block, size_t v_ind, size_t a_col)  //функция скалярного произведения для k столбцa матрицы A и вектора v, первый ненулевой элемент в котором располагается в позиции ind
 	{
 		T res = 0;
 //#pragma omp simd
-		for (size_t i = ind; i < n; i++)
-			res += R[i * n + k] * v[i];
+		for (size_t i = v_ind; i < n; i++)
+			res += R[i * n + a_col] * v[v_num_in_block * n + i];
 		return res;
 	}
-	void HHolder_A()
+	void HHolder_R()
 	{
 		size_t m = 0;
 
@@ -141,40 +150,49 @@ public:
 	}
 	void HHolder_Block(size_t i_start, size_t b_size)
 	{
+		size_t num_in_block;
 		for (j = i_start; j < i_start + b_size; j++)
 		{
-			form_v_gamma(j);
+			num_in_block = j - i_start;
+			count_v_gamma(j, num_in_block);
 
-#pragma omp parallel for simd private(k)       //??
-			for (k = j; k < n; k++)
-				factor[k - j] = scal(k, j) / gamma;
+			for (k = j; k < i_start + b_size; k++)
+				factor_block[k - j] = scal(num_in_block, j, k) / abs(v[num_in_block * n + j]);
 
-#pragma omp parallel for simd private(i)       //??
 			for (i = j; i < n; i++)
 			{
-
-//#pragma omp simd
-				for (k = j; k < n; k++)
-					R[i * n + k] -= v[i] * factor[k - j];
+				for (k = j; k < i_start + b_size; k++)
+					R[i * n + k] -= v[num_in_block * n + i] * factor_block[k - j];
 			}
+		}
+		
+		//count_factor(i_start + b_size, b_size, i_start); //посчитали к-ты
+		
+		//попробовать поменять два последних цикла местами (разрешив их зависимость):
+		for (i = i_start; i < n; i++) //по строкам А
+		{
+			for (k = 0; k <= i - i_start && k < b_size; k++)	//по векторам v ;???;
+
+				for (j = i_start + b_size; j < n; j++)	//по столбцам А (к-там factor)
+					R[i * n + j] -= v[k * n + i] * factor[k * n + (j - (i_start + b_size))];
 		}
 	}
 
 	void HHolder_Q()
 	{
-#pragma omp parallel for private(i)
+//#pragma omp parallel for private(i)
 		for (i = 0; i < n; i++)
 			copy(REF_A + i * n, REF_A + (i + 1) * n, Q + i * n);
 
 		for (i = 0; i < n; i++)
 		{
-#pragma omp parallel for private(j)
+//#pragma omp parallel for private(j)
 			for (j = 0; j < n; j++)
 				Q[j * n + i] /= R[i * n + i];
 
 			copy(R + i * (n + 1) + 1, R + (i + 1) * n, factor);
 
-#pragma omp parallel for private(k)
+//#pragma omp parallel for private(k)
 			for (k = 0; k < n; k++)
 				for (j = i + 1; j < n; j++)
 
