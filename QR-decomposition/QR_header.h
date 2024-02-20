@@ -13,21 +13,24 @@ class QR
 {
 private:
 
-	size_t i, j, k, n, block_size;
-	T* Q, * R, * REF_A, * v, * u, * factor, * factor_block;
+	size_t i, j, k, n, m, block_size;
+	T* Q, * R, * REF_A, * v, * u, * factor_block,  * factor, *w, *z, * R_tmp;
 	T eps = 1e-10 /*, gamma*/;
 
 public:
 
 	QR(bool flag, size_t size, size_t b_s) : n(size), block_size(b_s)//flag = 0 - ввод рандомных чисел, иначе ввод с клавиатуры
 	{
-		Q = new T[n * n];
+		Q = new T[n * n]();
 		R = new T[n * n];
+		R_tmp = new T[n * n];
 		REF_A = new T[n * n];
-		factor = new T[block_size * n];
-		factor_block = new T[block_size];
 		u = new T[n];
 		v = new T[block_size * n];
+		factor_block = new T[block_size];
+		factor = new T[block_size * n];
+		w = new T[block_size * n]();
+		z = new T[n];
 
 		if (flag)
 		{
@@ -112,16 +115,7 @@ public:
 				v[num_in_block * n + i] = u[i - column] * scl;
 		}
 	}
-
-	void count_factor(size_t start, size_t b_size, size_t v_ind) //порядок циклов!!!
-	{		
-			for (size_t j = start; j < n; j++) // по столбцам А
-
-				for (size_t i = 0; i < b_size; i++) // по векторам v
-			
-					factor[i * n + (j - start)] = scal(i, start-b_size+i, j) / abs(v[i * n + (v_ind+i)]);
-			
-	}
+	
 	T sgn(T val)                //неканоничный sign(x), который возвращает 1 для неотрицательных x, иначе -1
 	{
 		if (val >= 0)
@@ -151,52 +145,113 @@ public:
 	void HHolder_Block(size_t i_start, size_t b_size)
 	{
 		size_t num_in_block;
+
+		for (i = 0; i < block_size; i++)
+			memset(v + i * n, 0, n * sizeof(T));
+
 		for (j = i_start; j < i_start + b_size; j++)
 		{
 			num_in_block = j - i_start;
-			count_v_gamma(j, num_in_block);
+			count_v_gamma(j, num_in_block); //вычислили vi и заполнили ими v[]
 
 			for (k = j; k < i_start + b_size; k++)
-				factor_block[k - j] = scal(num_in_block, j, k) / abs(v[num_in_block * n + j]);
+				factor_block[k - j] = scal(num_in_block, j, k) / abs(v[num_in_block * n + j]); //вычислили к-ты для vi в блоке
 
 			for (i = j; i < n; i++)
 			{
 				for (k = j; k < i_start + b_size; k++)
-					R[i * n + k] -= v[num_in_block * n + i] * factor_block[k - j];
+					R[i * n + k] -= v[num_in_block * n + i] * factor_block[k - j]; //повычитали из блока
 			}
 		}
-		
-		//count_factor(i_start + b_size, b_size, i_start); //посчитали к-ты
-		
-		//попробовать поменять два последних цикла местами (разрешив их зависимость):
-		for (i = i_start; i < n; i++) //по строкам А
-		{
-			for (k = 0; k <= i - i_start && k < b_size; k++)	//по векторам v ;???;
 
-				for (j = i_start + b_size; j < n; j++)	//по столбцам А (к-там factor)
-					R[i * n + j] -= v[k * n + i] * factor[k * n + (j - (i_start + b_size))];
+		for (i = 0; i < block_size; i++)
+			memset(w + i * n, 0, n * sizeof(T));
+
+		for (i = 0; i < n; i++)
+		{
+			w[i * block_size] = (-2) * v[i];
+		}
+
+		for (i = 1; i < block_size; i++) //по столбцам результата в w
+		{
+			for (j = 0; j < n; j++) //по строкам W
+			{
+				for (k = 0; k < n; k++) //по строкам Y == v
+				{
+					for (m = 0; m < i/*block_size*/; m++) //по столбцам W
+					{
+
+						w[j * block_size + i] += (w[j * block_size + m] * v[m * n + k] + (j == k ? 1 : 0)) * v[i * n + k] * (-2);
+					}
+				}
+			}
+		}
+
+		for (i = 0; i < n; i++)
+			memset(Q + i * n, 0, n * sizeof(T));
+
+		for (j = 0; j < n; j++) //по строкам W
+		{
+			for (k = 0; k < n; k++) //по строкам Y == v
+			{
+				for (m = 0; m < block_size; m++) //по столбцам W
+				{
+					Q[j * n + k] += v[m * n + j] * w[k * block_size + m];
+				}
+			}
+		}
+
+		for (j = 0; j < n; j++)
+			Q[j * n + j] += 1;
+
+	/*	for (i = 0; i < n; i++)
+			memset(R + i * n, 0, n * sizeof(T));
+
+		for (j = 0; j < n; j++)
+		{
+			for (m = 0; m < n; m++)
+			{
+				for (k = 0; k < n; k++)
+				{
+					R[j * n + k] += Q[j * n + m] * REF_A[m * j + k];
+				}
+			}
+		}*/
+
+		for (i = 0; i < n; i++)
+			copy(R + i * n, R + (i + 1) * n, R_tmp + i * n);
+
+		for (j = i_start; j < n; j++)
+		{
+			for (m = 0; m < n; m++)
+			{
+				for (k = i_start + b_size; k < n; k++)
+				{
+					R[j * n + k] += R_tmp[j * n + m] * Q[m * n + k];
+				}
+			}
 		}
 	}
 
 	void HHolder_Q()
 	{
-//#pragma omp parallel for private(i)
+		//#pragma omp parallel for private(i)
 		for (i = 0; i < n; i++)
 			copy(REF_A + i * n, REF_A + (i + 1) * n, Q + i * n);
 
 		for (i = 0; i < n; i++)
 		{
-//#pragma omp parallel for private(j)
+			//#pragma omp parallel for private(j)
 			for (j = 0; j < n; j++)
 				Q[j * n + i] /= R[i * n + i];
 
 			copy(R + i * (n + 1) + 1, R + (i + 1) * n, factor);
 
-//#pragma omp parallel for private(k)
+			//#pragma omp parallel for private(k)
 			for (k = 0; k < n; k++)
 				for (j = i + 1; j < n; j++)
 
-					Q[k * n + j] -= factor[j-(i+1)] * Q[k * n + i];
+					Q[k * n + j] -= factor[j - (i + 1)] * Q[k * n + i];
 
 		}
 	}

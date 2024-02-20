@@ -470,3 +470,58 @@
 //	swap(RES, Q);
 //
 //}
+//
+//void HHolder_Block(size_t i_start, size_t b_size)
+//{
+//	for (j = i_start; j < i_start + b_size; j++)
+//	{
+//		form_v_gamma(j);
+//
+//#pragma omp parallel for simd private(k)       //??
+//		for (k = j; k < n; k++)
+//			factor[k - j] = scal(k, j) / gamma;
+//
+//#pragma omp parallel for simd private(i)       //??
+//		for (i = j; i < n; i++)
+//		{
+//
+//			//#pragma omp simd
+//			for (k = j; k < n; k++)
+//				R[i * n + k] -= v[i] * factor[k - j];
+//		}
+//	}
+//}
+//
+//void form_v_gamma(size_t ind)
+//{
+//	//для типа T должен существовать конструктор по умолчанию;
+//	T scl = 0;
+//	//#pragma omp parallel for simd reduction(+: scl) 
+//
+//	for (size_t i = 0; i < n - ind; i++)
+//	{
+//		u[i] = R[(i + ind) * n + ind];
+//		scl += u[i] * u[i];
+//	}
+//
+//	if (scl < eps)
+//	{
+//		v[ind] = 1;
+//		gamma = 0.5;
+//		return;
+//	}
+//
+//	else
+//	{
+//		scl = 1 / sqrt(scl);
+//		u[0] *= scl;
+//		gamma = (1 + abs(u[0]));
+//		v[ind] = sgn(u[0]) * gamma;
+//
+//		//#pragma omp parallel for simd
+//		for (size_t i = ind + 1; i < n; i++)
+//			v[i] = u[i - ind] * scl;
+//
+//		return;
+//	}
+//}
