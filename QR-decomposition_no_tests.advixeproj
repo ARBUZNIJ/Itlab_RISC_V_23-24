@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root>
- <cli_project type="bool">true</cli_project>
  <connectionOption>localhost</connectionOption>
+ <cli_project type="bool">true</cli_project>
  <rdmgr>
   <timestamp type="u64_t">1709540382</timestamp>
   <hostname>WIN-V9OTMTOJA68</hostname>
@@ -26,10 +26,12 @@
       <workload>
        <targetName>release</targetName>
        <launch_app.working_folder>C:\\Users\\kovko\\source\\repos\\QR-decomposition_no_tests\</launch_app.working_folder>
-       <launch_app.environment>PATH=C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\2023.2.0\\windows\\redist\\intel64_win\\compiler;%PATH%&#13;
+       <launch_app.environment>TBB_DLL_PATH=C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\2023.2.0\\windows\\..\\..\\..\\tbb\\latest\\redist\\intel64\\vc_mt&#13;
+PATH=C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\2023.2.0\\windows\\redist\\intel64_win\\compiler;C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\2023.2.0\\windows\\bin;C:\\Program Files (x86)\\Intel\\oneAPI\\mkl\\2023.2.0\\redist\\intel64;%PATH%&#13;
 &#13;
+    &#13;
     </launch_app.environment>
-       <launch_app.app_to_launch>C:\\Users\\kovko\\source\\repos\\QR-decomposition_no_tests\\x64\\Debug\\QR_decomposition.exe</launch_app.app_to_launch>
+       <launch_app.app_to_launch>C:\\Users\\kovko\\source\\repos\\QR-decomposition_no_tests\\x64\\Release\\QR_decomposition.exe</launch_app.app_to_launch>
        <launch_app.app_parameters></launch_app.app_parameters>
        <context>
         <contextValue>
@@ -266,6 +268,16 @@
      <recursive type="bool">false</recursive>
      <priority type="bool">false</priority>
     </searchDirectory>
+    <searchDirectory>
+     <name>C:\\Users\\kovko\\source\\repos\\QR-decomposition_no_tests\\x64\\Release</name>
+     <recursive type="bool">false</recursive>
+     <priority type="bool">false</priority>
+    </searchDirectory>
+    <searchDirectory>
+     <name>C:\\Program Files (x86)\\Intel\\oneAPI\\compiler\\2023.2.0\\windows\\lib\\ocloc</name>
+     <recursive type="bool">false</recursive>
+     <priority type="bool">false</priority>
+    </searchDirectory>
    </searchCategory>
    <searchCategory>
     <category type="u8_t">2</category>
@@ -277,6 +289,11 @@
     <searchDirectory>
      <name>C:\\Users\\kovko\\source\\repos\\QR-decomposition_no_tests</name>
      <recursive type="bool">true</recursive>
+     <priority type="bool">false</priority>
+    </searchDirectory>
+    <searchDirectory>
+     <name>C:\\Users\\kovko\\source\\repos\\QR-decomposition_no_tests\\x64\\Release</name>
+     <recursive type="bool">false</recursive>
      <priority type="bool">false</priority>
     </searchDirectory>
    </searchCategory>
@@ -354,6 +371,21 @@
     </searchDirectory>
     <searchDirectory>
      <name>C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.22621.0\\cppwinrt</name>
+     <recursive type="bool">false</recursive>
+     <priority type="bool">false</priority>
+    </searchDirectory>
+    <searchDirectory>
+     <name>C:\\Program Files (x86)\\Intel\\oneAPI\\mkl\\2023.2.0\\include</name>
+     <recursive type="bool">false</recursive>
+     <priority type="bool">false</priority>
+    </searchDirectory>
+    <searchDirectory>
+     <name>C:\\Program Files (x86)\\Intel\\oneAPI\\mkl\\2023.2.0\\include\\fftw</name>
+     <recursive type="bool">false</recursive>
+     <priority type="bool">false</priority>
+    </searchDirectory>
+    <searchDirectory>
+     <name>C:\\Program Files (x86)\\Intel\\oneAPI\\mkl\\2023.2.0\\include\\intel64</name>
      <recursive type="bool">false</recursive>
      <priority type="bool">false</priority>
     </searchDirectory>
